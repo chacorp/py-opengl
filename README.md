@@ -1,2 +1,2 @@
 # py-opengl
-playing with rendering 
+playing with opengl in python

@@ -1,14 +1,25 @@
+'''
+This code visualises registered garment on the original smpl body
+If you use this code please cite:
+"Multi-Garment Net: Learning to Dress 3D People from Images", ICCV 2019
+
+Code author: Bharat
+'''
+from __future__ import print_function
+
 import os
 from os.path import exists, join, split
 from glob import glob
 import numpy as np
-import cv2
-from PIL import Image
 
 import glfw
 from OpenGL.GL import *
 import OpenGL.GL.shaders as shaders
+import numpy as np
+from PIL import Image
+
 from easydict import EasyDict
+
 
 def compute_face_norm(vn, f):
     v1 = vn[f:, 0]
@@ -20,73 +31,81 @@ def compute_face_norm(vn, f):
     return np.cross(e1, e2)
 
 def render():
-    import time
-    from easydict import EasyDict as edict
-    start = time.time()
-    
-    mesh = edict()
+    mesh = EasyDict({})
+    # mesh.v, mesh.f, mesh.vt, mesh.ft, mesh.vn
     mesh.v = np.array([
-        [ 0.5,  0.5, 0.0],  # top right
-        [ 0.5, -0.5, 0.0],  # bottom right
-        [-0.5, -0.5, 0.0],  # bottom left
-        [-0.5,  0.5, 0.0]   # top left 
+        [ 0.5,  0.5, 0.0], # top right
+        [ 0.5, -0.5, 0.0], # bottom right
+        [-0.5, -0.5, 0.0], # bottom left
+        [-0.5,  0.5, 0.0]  # top left
     ])
     mesh.f = np.array([
-        [0, 1, 3],   # first triangle
-        [1, 2, 3]    # second triangle
+        [0, 1, 3],
+        [1, 2, 3]
     ])
     mesh.vt = np.array([
-        [ 0.5,  0.5],  # top right
-        [ 0.5, -0.5],  # bottom right
-        [-0.5, -0.5],  # bottom left
-        [-0.5,  0.5]   # top left 
+        [1.0, 1.0],
+        [1.0, 0.0],
+        [0.0, 0.0],
+        [0.0, 1.0],
     ])
     mesh.ft = mesh.f
-    mesh.vn = mesh.v
+    mesh.vn = np.zeros_like(mesh.v)
 
-    image_path = "willbeback.jpg"
-    # import pdb; pdb.set_trace()
+################## shader shader shader shader shader shader shader shader ##############################
+    image_path = "test_image.png"
+    rendered = main(mesh, 1024, image_path, angle=0)
+    # rendered = rendered[::-1, :, :]
 
-    ### get angle from filename
-    angle = 0
-
-    rendered = main(mesh, 512, image_path, angle)
-    rendered = rendered[::-1, :, :]
-    # name = image_path.split('/')[-1].split('.')[0][:11]
+    name = image_path.split('/')[-1].split('.')[0] #[:11]
 
     # make directory
-    savefolder = 'output'
-    
+    savefolder = join('output')
+
     if not exists(savefolder):
         os.makedirs(savefolder)
 
-    savefile = join(savefolder, 'vsb_{:03}.png'.format(angle))
+    savefile = join(savefolder, '{}.png'.format(name))
 
-    print('Image rendered: {}, shape: {}'.format(savefile, rendered.shape))
-    print(rendered.min(), rendered.max())
     Image.fromarray(rendered).save(savefile)
-
-    print('Done')
-    #########################################################################################################
     return
 
-    
 def LoadTexture(filename):
     texName = 0
     pBitmap = Image.open(filename)
     pBitmapData = np.array(list(pBitmap.getdata()), np.int8)
+    # print(pBitmapData.shape)
     texName = glGenTextures(1)
     glBindTexture(GL_TEXTURE_2D, texName)
 
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1)
+    # glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP)
+    # glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP)
+    # glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT)
+    # glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT)
+    # glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
+    # glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
+    
+    ### Texture Wrapping
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT)
+    
+    ### Texture Filtering
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
+    """        
+        GL_NEAREST_MIPMAP_NEAREST: nearest mipmap to match the pixel size and uses nearest neighbor interpolation for texture sampling.
+        GL_LINEAR_MIPMAP_NEAREST:  nearest mipmap level and samples that level using linear interpolation.
+        GL_NEAREST_MIPMAP_LINEAR:  linearly interpolates between the two closest mipmaps & samples via nearest neighbor interpolation.
+        GL_LINEAR_MIPMAP_LINEAR:   linearly interpolates between the two closest mipmaps & samples via linear interpolation.
+    """
+    
+    glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_DECAL)
     glTexImage2D(
         GL_TEXTURE_2D, 0, GL_RGB, pBitmap.size[0], pBitmap.size[1], 0,
         GL_RGB, GL_UNSIGNED_BYTE, pBitmapData
     )
+    glGenerateMipmap(GL_TEXTURE_2D)
     return texName
 
 def rotation(M, angle, x, y, z):
@@ -112,177 +131,136 @@ def y_rotation(angle):
     return R
 
 def main(mesh, resolution, image_path, angle):
-    ##### shape
-    # print(quad.shape, indices.shape, vt.shape, ft.shape)
-    # for i,j in zip(indices[30000:30100, :], ft[30000:30100,:]):
-    #     print(i,j)
+    
     quad, indices, vt, ft, vn = mesh.v, mesh.f, mesh.vt, mesh.ft, mesh.vn
-    # quad, indices, vt, ft = mesh.v, mesh.f, mesh.vt, mesh.ft
-    # import pdb; pdb.set_trace()
-    # import pdb;pdb.set_trace()
+
     if not glfw.init():
         return
-        
+
     # glfw.window_hint(glfw.CONTEXT_VERSION_MAJOR, 3)
     # glfw.window_hint(glfw.CONTEXT_VERSION_MINOR, 3)
     # glfw.window_hint(glfw.OPENGL_PROFILE, glfw.OPENGL_COMPAT_PROFILE)
-    glfw.window_hint(glfw.VISIBLE, glfw.FALSE)
-
+    
+    # glfw.window_hint(glfw.VISIBLE, glfw.FALSE)
     window = glfw.create_window(resolution, resolution, "My OpenGL window", None, None)
 
     if not window:
         glfw.terminate()
-        print('failed to open window!')
         return
 
     glfw.make_context_current(window)
-    # add column filled with 0.0 # ????? 
-    # quad = np.concatenate( (quad, np.zeros((quad.shape[0], 1))), axis=1 )
 
-    new_v = quad[indices].reshape(-1, 3)
+
+    new_v  = quad[indices].reshape(-1, 3)
     new_vt = vt[ft].reshape(-1,2)
     new_vt = np.concatenate((new_vt, np.ones((new_vt.shape[0],1)) ), axis=1)
     new_vn = vn[indices].reshape(-1, 3)
 
-    # white color : mask == 1
-    # color = np.ones((quad.shape[0], 1))
-    # color = np.random.rand(*quad.shape)
-
-    # concatenate quad and color
-    # quad = np.concatenate( (quad, color), axis=1)
-    # quad = quad[indices].reshape(-1, 3)
-    # quad = np.concatenate( (new_v, new_vt), axis=1)
-
     quad = np.concatenate( (new_v, new_vt, new_vn), axis=1)
-    quad = np.array(quad, dtype = np.float32)
+    # quad = np.concatenate( (new_v, new_vt), axis=1)
+    # quad = new_v
+    #                   positions        colors
+    # quad    = [-0.5,  0.5, 0.0, 1.0, 1.0, 1.0,  # Top-left
+    #             0.5,  0.5, 0.0, 0.0, 1.0, 0.0,  # Top-right
+    #             0.5, -0.5, 0.0, 0.0, 0.0, 1.0,  # Bottom-right
+    #            -0.5, -0.5, 0.0, 1.0, 1.0, 1.0]  # Bottom-left
 
-    garment_mask = np.zeros((resolution, resolution, 3), dtype=np.uint8)
+    # indices = [0, 1, 2,
+    #             2, 3, 0]
+    quad = np.array(quad, dtype=np.float32)
 
-    ## texture for reprojection ################
-    texture = LoadTexture(image_path)
-
-    glEnable(GL_TEXTURE_2D)
-    glBindTexture(GL_TEXTURE_2D, texture)
-    ##############################################
-
-    vertex_shader_source = """
-        #version 330
-        layout(location = 0) in vec3 position;
-        layout(location = 1) in vec3 texcoord;
-        layout(location = 2) in vec3 normal;
-        
-        //uniform mat4 transform;
-
-        out vec4 worldPosition;
-        out vec3 OutNormal;
-
-        void main()
-        {
-            vec4 tempPosition = vec4(position, 1.0f);
-            worldPosition = tempPosition;
-            gl_Position   = tempPosition;
-
-            OutNormal = vec3(texcoord.xy, 0.0) + normal * 0.000000001;
-        }
-    """
-
-    fragment_shader_source = """
-        #version 330
-        in vec4 worldPosition;
-        in vec3 OutNormal;
-
-        out vec4 outColor;
-        
-        uniform sampler2D samplerTex; // Image_Coordinate texture
-
-        void main()
-        {          
-            vec3 temp = worldPosition.xyz;
-            temp = (temp + 1.0) * 0.5;
-
-            //vec2 uv = worldPosition.xy;
-            vec2 uv = OutNormal.xy;
-                  
-            outColor = worldPosition + texture(samplerTex, uv);
-        }
-    """
-
-
-    # glBindVertexArray(VAO)
-    VBO = glGenBuffers(1)
-    glBindBuffer(GL_ARRAY_BUFFER, VBO)
-    # glBufferData(GL_ARRAY_BUFFER, 4*6*quad.shape[0], quad, GL_STATIC_DRAW)
-    glBufferData(GL_ARRAY_BUFFER, 4*3*3*quad.shape[0], quad, GL_STATIC_DRAW)
-    # glBufferData(GL_ARRAY_BUFFER, 4*3*quad.shape[0], quad, GL_STATIC_DRAW)
-
-    vertex_shader = shaders.compileShader(vertex_shader_source, GL_VERTEX_SHADER)
+    ############################################## shader ################
+    vertex_shader_source   = open('shader.vs', 'r').read()
+    fragment_shader_source = open('shader.fs', 'r').read()
+    
+    vertex_shader   = shaders.compileShader(vertex_shader_source,   GL_VERTEX_SHADER)
     fragment_shader = shaders.compileShader(fragment_shader_source, GL_FRAGMENT_SHADER)
-    shader = shaders.compileProgram(vertex_shader, fragment_shader)
+    shader          = shaders.compileProgram(vertex_shader, fragment_shader)
+
+    ############################################## buffer ################
 
     # EBO = glGenBuffers(1)
     # glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO)
     # glBufferData(GL_ELEMENT_ARRAY_BUFFER, 4*indices.shape[0]*indices.shape[1], indices, GL_STATIC_DRAW)
-
+    
+    VBO = glGenBuffers(1)
+    glBindBuffer(GL_ARRAY_BUFFER, VBO)
+    glBufferData(GL_ARRAY_BUFFER, 4*quad.shape[0]*quad.shape[1], quad, GL_STATIC_DRAW)
+    """
+        GL_STREAM_DRAW:  the data is set only once and used by the GPU at most a few times.
+        GL_STATIC_DRAW:  the data is set only once and used many times.
+        GL_DYNAMIC_DRAW: the data is changed a lot and used many times.
+    """
+    
+    # 4*3*3 : size of float * X,Y,Z * pos, tex, nor
+    vertex_stride = 4 * quad.shape[1]
+    
     position = glGetAttribLocation(shader, "position")
-    # glVertexAttribPointer(position, 3, GL_FLOAT, GL_FALSE, 4*6, ctypes.c_void_p(0))
-    glVertexAttribPointer(position, 3, GL_FLOAT, GL_FALSE, 4*9, ctypes.c_void_p(0))
-    # glVertexAttribPointer(position, 3, GL_FLOAT, GL_FALSE, 4*3, ctypes.c_void_p(0))
+    glVertexAttribPointer(position, 3, GL_FLOAT, GL_FALSE, vertex_stride, ctypes.c_void_p(0))
     glEnableVertexAttribArray(position)
-
+    
     texcoord = glGetAttribLocation(shader, "texcoord")
-    # glVertexAttribPointer(texcoord, 3, GL_FLOAT, GL_FALSE, 4*6, ctypes.c_void_p(12))
-    glVertexAttribPointer(texcoord, 3, GL_FLOAT, GL_FALSE, 4*9, ctypes.c_void_p(12))
+    glVertexAttribPointer(texcoord, 3, GL_FLOAT, GL_FALSE, vertex_stride, ctypes.c_void_p(12))
     glEnableVertexAttribArray(texcoord)
 
     normal = glGetAttribLocation(shader, "normal")
-    # glVertexAttribPointer(texcoord, 3, GL_FLOAT, GL_FALSE, 4*6, ctypes.c_void_p(12))
-    glVertexAttribPointer(normal, 3, GL_FLOAT, GL_FALSE, 4*9, ctypes.c_void_p(24))
+    glVertexAttribPointer(normal,   3, GL_FLOAT, GL_FALSE, vertex_stride, ctypes.c_void_p(24))
     glEnableVertexAttribArray(normal)
-
-
+    
+    ############################################## texture map ###########
+    texture = LoadTexture(image_path)
+    glEnable(GL_TEXTURE_2D)
+    glBindTexture(GL_TEXTURE_2D, texture)
+    # glBindVertexArray(VBO);
+    
+    ############################################## render ################
     glUseProgram(shader)
     glClearColor(0.0, 0.0, 0.0, 0.0)
-    glClearDepth(1.0)
+    # glClearDepth(1.0)
 
-    glDepthMask(GL_TRUE)
-    glDepthFunc(GL_LESS)
-    glEnable(GL_DEPTH_TEST)
-    glEnable(GL_CULL_FACE)
-    glCullFace(GL_BACK)
-    glFrontFace(GL_CCW)
-    glShadeModel(GL_SMOOTH)
-    glDepthRange(0.0, 1.0)
+    # glDepthMask(GL_TRUE)
+    # glDepthFunc(GL_LESS)
+    # glEnable(GL_DEPTH_TEST)
+    # glEnable(GL_CULL_FACE)
+    # glCullFace(GL_BACK)
+    # glFrontFace(GL_CCW)
+    # glShadeModel(GL_SMOOTH)
+    # glDepthRange(0.0, 1.0)
 
+    ############################################## camera ################
     # rotation_mat = rotation(np.eye(4, dtype=np.float32), angle*-18.0, 0.0, 1.0, 0.0)
-
-    ### apply rotation
     # rotation_mat = y_rotation(angle*-18.0)
-    rotation_mat = y_rotation(angle)
+    # rotation_mat = y_rotation(angle)
+
     # transform = glGetUniformLocation(shader, "transform")
     # glUniformMatrix4fv(transform, 1, GL_FALSE, rotation_mat)
 
     while not glfw.window_should_close(window):
-        glfw.poll_events()
         
+        # glEnable(GL_DEPTH_TEST)
+        # glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
         glClear(GL_COLOR_BUFFER_BIT)
+
+        # glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)
+
+        # glDrawElements(GL_TRIANGLES, indices.shape[0]*3, GL_UNSIGNED_INT, None)
+        # glDrawElements(GL_TRIANGLES, quad.shape[0], GL_UNSIGNED_INT, None)
         glDrawArrays(GL_TRIANGLES, 0, quad.shape[0])
 
         glfw.swap_buffers(window)
+        glfw.poll_events()
 
-        # glReadBuffer(GL_FRONT)
-        glReadBuffer(GL_BACK)
+        glReadBuffer(GL_FRONT)
+        # glReadBuffer(GL_BACK)
 
-        pixels = glReadPixels(0, 0, resolution, resolution, GL_RGBA, GL_UNSIGNED_BYTE)
-
+        pixels = glReadPixels(0, 0, resolution, resolution, GL_RGB, GL_UNSIGNED_BYTE)
         a = np.frombuffer(pixels, dtype=np.uint8)
-        a = a.reshape((resolution, resolution, -1))
+        a = a.reshape((resolution, resolution, 3))
         #a = a.transpose(1, 0, 2)[:, ::-1, :]
-        garment_mask = a
-        break
+        # break
 
     glfw.terminate()
-    return garment_mask
+    return a
 
 if __name__ == '__main__':
-    render() # visibility render
-    # print('Done')
+    render()

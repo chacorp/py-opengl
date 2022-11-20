@@ -54,7 +54,8 @@ def render():
 
 ################## shader shader shader shader shader shader shader shader ##############################
     image_path = "test_image.png"
-    rendered = main(mesh, 1024, image_path, angle=0)
+            
+    rendered = main(mesh, 1024, image_path, angle=0, timer=True)
     rendered = rendered[::-1, :, :]
 
     name = image_path.split('/')[-1].split('.')[0] #[:11]
@@ -75,6 +76,7 @@ def LoadTexture(filename):
     texName = 0
     
     pBitmap = Image.open(filename)
+    pBitmap = pBitmap.transpose(Image.Transpose.FLIP_TOP_BOTTOM) 
     glformat = GL_RGB if pBitmap.mode == "RGB" else GL_RGBA
     # pBitmap = pBitmap.convert('RGB') # 'RGBA
     pBitmapData = np.array(pBitmap, np.uint8)
@@ -133,7 +135,10 @@ def y_rotation(angle):
                   [ 0.0,       0.0,        0.0,        1.0]], dtype=np.float32)
     return R
 
-def main(mesh, resolution, image_path, angle):
+def main(mesh, resolution, image_path, angle, timer=False):
+    if timer == True:
+        import time
+        start = time.time()
     
     quad, indices, vt, ft, vn = mesh.v, mesh.f, mesh.vt, mesh.ft, mesh.vn
 
@@ -238,8 +243,14 @@ def main(mesh, resolution, image_path, angle):
 
     # transform = glGetUniformLocation(shader, "transform")
     # glUniformMatrix4fv(transform, 1, GL_FALSE, rotation_mat)
+    
+    gltimey = glGetUniformLocation(shader, "timer_y")
+    gltimex = glGetUniformLocation(shader, "timer_x")
 
     while not glfw.window_should_close(window):
+        curr_time = (time.time()-start) * 0.5
+        glUniform1f(gltimey, np.sin(curr_time))
+        glUniform1f(gltimex, np.cos(curr_time))
         
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
         # glClear(GL_COLOR_BUFFER_BIT)
@@ -256,9 +267,9 @@ def main(mesh, resolution, image_path, angle):
         glReadBuffer(GL_FRONT)
         # glReadBuffer(GL_BACK)
 
-        pixels = glReadPixels(0, 0, resolution, resolution, GL_RGB, GL_UNSIGNED_BYTE)
+        pixels = glReadPixels(0, 0, resolution, resolution, GL_RGBA, GL_UNSIGNED_BYTE)
         a = np.frombuffer(pixels, dtype=np.uint8)
-        a = a.reshape((resolution, resolution, 3))
+        a = a.reshape((resolution, resolution, 4))
         #a = a.transpose(1, 0, 2)[:, ::-1, :]
         # break
 

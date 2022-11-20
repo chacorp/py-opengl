@@ -5,6 +5,8 @@ layout(location = 1) in vec3 texcoord;
 layout(location = 2) in vec3 normal;
 
 // uniform mat4 transform;
+uniform float timer_y;
+uniform float timer_x;
 
 out vec4 worldPosition;
 // out vec3 vertColor;
@@ -13,10 +15,11 @@ out vec3 OutCoord;
 
 void main()
 {
-    // vec4 tempPosition = transform * vec4(0.0f) + vec4(position, 1.0f);
-    // worldPosition = tempPosition;
-    // gl_Position = tempPosition + vec4((texcoord), 0.0f); // world space
-    gl_Position = vec4(position, 1.0f);
+    vec4 tempPosition = vec4(position, 1.0f);
+    
+    tempPosition.x = tempPosition.x + timer_x * 0.5;
+    tempPosition.y = tempPosition.y + timer_y * 0.5;
+    gl_Position = tempPosition;
     worldPosition = vec4(position, 1.0f);
 
     // vertColor = vert_color;

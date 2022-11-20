@@ -70,20 +70,15 @@ def render():
     Image.fromarray(rendered).save(savefile)
     return
 
+
 def LoadTexture(filename):
     texName = 0
-    ext = os.path.splitext(filename)[1]
     
-    if ext == '.png':
-        form = ['RGBA', GL_RGBA]
-    else:
-        form = ['RGB', GL_RGB]
-        
     pBitmap = Image.open(filename)
-    pBitmap = pBitmap.convert(form[0])
+    glformat = GL_RGB if pBitmap.mode == "RGB" else GL_RGBA
+    # pBitmap = pBitmap.convert('RGB') # 'RGBA
     pBitmapData = np.array(pBitmap, np.uint8)
     # pBitmapData = np.array(list(pBitmap.getdata()), np.int8)
-    # print(pBitmapData.shape)
     texName = glGenTextures(1)
     glBindTexture(GL_TEXTURE_2D, texName)
 
@@ -111,8 +106,7 @@ def LoadTexture(filename):
     
     glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_DECAL)
     glTexImage2D(
-        GL_TEXTURE_2D, 0, form[1], pBitmap.size[0], pBitmap.size[1], 0,
-        form[1], GL_UNSIGNED_BYTE, pBitmapData
+        GL_TEXTURE_2D, 0, GL_RGB, pBitmap.size[0], pBitmap.size[1], 0, glformat, GL_UNSIGNED_BYTE, pBitmapData
     )
     glGenerateMipmap(GL_TEXTURE_2D)
     return texName

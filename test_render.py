@@ -37,11 +37,11 @@ def render():
         [ 0.5,  0.5, 0.0], # top right
         [ 0.5, -0.5, 0.0], # bottom right
         [-0.5, -0.5, 0.0], # bottom left
-        [-0.5,  0.5, 0.0]  # top left
+        [-0.5,  0.5, 0.0], # top left
     ])
     mesh.f = np.array([
-        [0, 1, 3],
-        [1, 2, 3]
+        [0, 1, 3], # first triangle
+        [1, 2, 3],  # second triangle
     ])
     mesh.vt = np.array([
         [1.0, 1.0],
@@ -55,7 +55,7 @@ def render():
 ################## shader shader shader shader shader shader shader shader ##############################
     image_path = "test_image.png"
     rendered = main(mesh, 1024, image_path, angle=0)
-    # rendered = rendered[::-1, :, :]
+    rendered = rendered[::-1, :, :]
 
     name = image_path.split('/')[-1].split('.')[0] #[:11]
 
@@ -72,8 +72,17 @@ def render():
 
 def LoadTexture(filename):
     texName = 0
+    ext = os.path.splitext(filename)[1]
+    
+    if ext == '.png':
+        form = ['RGBA', GL_RGBA]
+    else:
+        form = ['RGB', GL_RGB]
+        
     pBitmap = Image.open(filename)
-    pBitmapData = np.array(list(pBitmap.getdata()), np.int8)
+    pBitmap = pBitmap.convert(form[0])
+    pBitmapData = np.array(pBitmap, np.uint8)
+    # pBitmapData = np.array(list(pBitmap.getdata()), np.int8)
     # print(pBitmapData.shape)
     texName = glGenTextures(1)
     glBindTexture(GL_TEXTURE_2D, texName)
@@ -102,8 +111,8 @@ def LoadTexture(filename):
     
     glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_DECAL)
     glTexImage2D(
-        GL_TEXTURE_2D, 0, GL_RGB, pBitmap.size[0], pBitmap.size[1], 0,
-        GL_RGB, GL_UNSIGNED_BYTE, pBitmapData
+        GL_TEXTURE_2D, 0, form[1], pBitmap.size[0], pBitmap.size[1], 0,
+        form[1], GL_UNSIGNED_BYTE, pBitmapData
     )
     glGenerateMipmap(GL_TEXTURE_2D)
     return texName
@@ -153,7 +162,7 @@ def main(mesh, resolution, image_path, angle):
 
     new_v  = quad[indices].reshape(-1, 3)
     new_vt = vt[ft].reshape(-1,2)
-    new_vt = np.concatenate((new_vt, np.ones((new_vt.shape[0],1)) ), axis=1)
+    new_vt = np.concatenate((new_vt, np.zeros((new_vt.shape[0],1)) ), axis=1)
     new_vn = vn[indices].reshape(-1, 3)
 
     quad = np.concatenate( (new_v, new_vt, new_vn), axis=1)
@@ -164,10 +173,10 @@ def main(mesh, resolution, image_path, angle):
     #             0.5,  0.5, 0.0, 0.0, 1.0, 0.0,  # Top-right
     #             0.5, -0.5, 0.0, 0.0, 0.0, 1.0,  # Bottom-right
     #            -0.5, -0.5, 0.0, 1.0, 1.0, 1.0]  # Bottom-left
-
     # indices = [0, 1, 2,
     #             2, 3, 0]
     quad = np.array(quad, dtype=np.float32)
+    # print (quad)
 
     ############################################## shader ################
     vertex_shader_source   = open('shader.vs', 'r').read()
@@ -208,10 +217,10 @@ def main(mesh, resolution, image_path, angle):
     glEnableVertexAttribArray(normal)
     
     ############################################## texture map ###########
-    texture = LoadTexture(image_path)
     glEnable(GL_TEXTURE_2D)
+    texture = LoadTexture(image_path)
+    glActiveTexture(GL_TEXTURE0)
     glBindTexture(GL_TEXTURE_2D, texture)
-    # glBindVertexArray(VBO);
     
     ############################################## render ################
     glUseProgram(shader)
@@ -220,7 +229,8 @@ def main(mesh, resolution, image_path, angle):
 
     # glDepthMask(GL_TRUE)
     # glDepthFunc(GL_LESS)
-    # glEnable(GL_DEPTH_TEST)
+    glEnable(GL_DEPTH_TEST)
+    glEnable(GL_BLEND)
     # glEnable(GL_CULL_FACE)
     # glCullFace(GL_BACK)
     # glFrontFace(GL_CCW)
@@ -237,9 +247,8 @@ def main(mesh, resolution, image_path, angle):
 
     while not glfw.window_should_close(window):
         
-        # glEnable(GL_DEPTH_TEST)
-        # glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
-        glClear(GL_COLOR_BUFFER_BIT)
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+        # glClear(GL_COLOR_BUFFER_BIT)
 
         # glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)
 

@@ -1,4 +1,4 @@
-#version 330
+#version 330 core
 in vec4 worldPosition;
 // in vec3 vertColor;
 in vec3 OutNormal;
@@ -20,6 +20,6 @@ void main()
 
     //if(Vis>0.0) OutColor = texture(samplerTex, uv);
     float zero = 0.000000001;
-    OutColor = texture(samplerTex, uv) + (vec4(OutNormal, 0.0f) + worldPosition) * zero + vec4(OutCoord, 0.0f);
+    OutColor = texture(samplerTex, uv) + (vec4(OutNormal, 0.0f) + worldPosition) * zero + vec4(OutCoord, 0.0f) * zero;
     // OutColor = vec4(vertColor, 1.0f);
 }

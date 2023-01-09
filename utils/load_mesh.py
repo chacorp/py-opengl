@@ -1,4 +1,7 @@
 import numpy as np
+from plyfile import PlyData, PlyElement
+# pip install plyfile
+
 """
 Reference:
     https://github.com/halimacc/DenseHumanBodyCorrespondences/blob/6a6e2a7b87113fe535967bf78da80d2373f74e11/meshutil.py#L29
@@ -59,4 +62,4 @@ def load_mesh(mesh_path):
        faces -= 1
     vertices = vertices.astype(np.float32)
     faces = faces.astype(np.int32)
-    return vertices, 
+    return vertices, faces

@@ -1,10 +1,3 @@
-'''
-This code visualises registered garment on the original smpl body
-If you use this code please cite:
-"Multi-Garment Net: Learning to Dress 3D People from Images", ICCV 2019
-
-Code author: Bharat
-'''
 from __future__ import print_function
 
 import os
@@ -131,7 +124,16 @@ def y_rotation(angle):
     c, s = np.cos(angle), np.sin(angle)
     R = np.array([[   c,       0.0,          s,        0.0],
                   [ 0.0,       1.0,        0.0,        0.0],
-                  [   s,       0.0,          c,        0.0],
+                  [  -s,       0.0,          c,        0.0],
+                  [ 0.0,       0.0,        0.0,        1.0]], dtype=np.float32)
+    return R
+
+def z_rotation(angle):
+    angle = np.pi * angle / 180.0
+    c, s = np.cos(angle), np.sin(angle)
+    R = np.array([[   c,        -s,        0.0,        0.0],
+                  [   s,         c,        0.0,        0.0],
+                  [ 0.0,       0.0,        1.0,        0.0],
                   [ 0.0,       0.0,        0.0,        1.0]], dtype=np.float32)
     return R
 
@@ -158,7 +160,7 @@ def main(mesh, resolution, image_path, angle, timer=False):
 
     glfw.make_context_current(window)
 
-
+    # print(quad.shape, indices.shape, vt.shape, ft.shape, vn.shape)
     new_v  = quad[indices].reshape(-1, 3)
     new_vt = vt[ft].reshape(-1,2)
     new_vt = np.concatenate((new_vt, np.zeros((new_vt.shape[0],1)) ), axis=1)
@@ -187,20 +189,24 @@ def main(mesh, resolution, image_path, angle, timer=False):
 
     ############################################## buffer ################
 
+    # VAO = glGenBuffers(1)
+    # glBindVertexArray(VAO)
+
+
     # EBO = glGenBuffers(1)
     # glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO)
     # glBufferData(GL_ELEMENT_ARRAY_BUFFER, 4*indices.shape[0]*indices.shape[1], indices, GL_STATIC_DRAW)
     
     VBO = glGenBuffers(1)
     glBindBuffer(GL_ARRAY_BUFFER, VBO)
-    glBufferData(GL_ARRAY_BUFFER, 4*quad.shape[0]*quad.shape[1], quad, GL_STATIC_DRAW)
+    glBufferData(GL_ARRAY_BUFFER, 4*quad.shape[0]*quad.shape[1], quad, GL_DYNAMIC_DRAW)
     """
         GL_STREAM_DRAW:  the data is set only once and used by the GPU at most a few times.
         GL_STATIC_DRAW:  the data is set only once and used many times.
         GL_DYNAMIC_DRAW: the data is changed a lot and used many times.
     """
     
-    # 4*3*3 : size of float * X,Y,Z * pos, tex, nor
+    # 4*3*3 : size of float * len(X,Y,Z) * len(pos, tex, nor)
     vertex_stride = 4 * quad.shape[1]
     
     position = glGetAttribLocation(shader, "position")
@@ -223,6 +229,7 @@ def main(mesh, resolution, image_path, angle, timer=False):
     
     ############################################## render ################
     glUseProgram(shader)
+    # glBindVertexArray(VAO)
     glClearColor(0.0, 0.0, 0.0, 0.0)
     # glClearDepth(1.0)
 
@@ -241,16 +248,18 @@ def main(mesh, resolution, image_path, angle, timer=False):
     # rotation_mat = y_rotation(angle*-18.0)
     # rotation_mat = y_rotation(angle)
 
-    # transform = glGetUniformLocation(shader, "transform")
-    # glUniformMatrix4fv(transform, 1, GL_FALSE, rotation_mat)
-    
+    transform = glGetUniformLocation(shader, "transform")    
     gltimey = glGetUniformLocation(shader, "timer_y")
     gltimex = glGetUniformLocation(shader, "timer_x")
 
     while not glfw.window_should_close(window):
-        curr_time = (time.time()-start) * 0.5
-        glUniform1f(gltimey, np.sin(curr_time))
-        glUniform1f(gltimex, np.cos(curr_time))
+        curr_time = (time.time()-start)
+        distance = 0.1
+        glUniform1f(gltimey, np.sin(curr_time) * distance)
+        glUniform1f(gltimex, np.cos(curr_time) * distance)
+        
+        rotation_mat = z_rotation(curr_time * 360)
+        glUniformMatrix4fv(transform, 1, GL_FALSE, rotation_mat)
         
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
         # glClear(GL_COLOR_BUFFER_BIT)

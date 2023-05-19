@@ -229,6 +229,7 @@ def main(mesh, resolution, image_path, angle, timer=False):
     
     ############################################## render ################
     glUseProgram(shader)
+    glUniform1i(glGetUniformLocation(shader, "texture1"), texture)
     # glBindVertexArray(VAO)
     glClearColor(0.0, 0.0, 0.0, 0.0)
     # glClearDepth(1.0)
